@@ -237,6 +237,7 @@ namespace MelksLuminanceTracker
 				Globals.Init("MelksLuminanceTracker", Host, Core);
 				//Initialize the view.
 				MVWireupHelper.WireupStart(this, Host);
+                Core.EchoFilter.ServerDispatch += EchoFilter_ServerDispatch;
                 Instance = this;
 			}
 			catch (Exception ex) {Util.WriteToChat($"Startup Error: {ex}");}
@@ -246,8 +247,9 @@ namespace MelksLuminanceTracker
 		{
 			try
 			{
+                Core.EchoFilter.ServerDispatch -= EchoFilter_ServerDispatch;
                 		//Destroy the view.
-                        
+
                			MVWireupHelper.WireupEnd(this);
                 Instance = null;
 			}
@@ -1561,6 +1563,21 @@ namespace MelksLuminanceTracker
             }
         }
 
+        // Counts kills from the server's KillerNotification game event (0xF7B0 / 0x01AD), sent once per
+        // creature you land the killing blow on. Unlike the "You've banked" chat line, this fires even
+        // when the creature gives no luminance. Same approach as UtilityBelt's StatusHUD.
+        private void EchoFilter_ServerDispatch(object sender, NetworkMessageEventArgs e)
+        {
+            try
+            {
+                if (e.Message.Type == 0xF7B0 && e.Message.Value<int>("event") == 0x01AD)
+                {
+                    killsTotal += 1;
+                }
+            }
+            catch (Exception ex) {Util.WriteToChat($"EchoFilter_ServerDispatch Error: {ex}");}
+        }
+
         [BaseEvent("ChatBoxMessage")]
         private void  Current_ChatBoxMessage(object sender, ChatTextInterceptEventArgs e)
         {
@@ -1610,7 +1627,6 @@ namespace MelksLuminanceTracker
                     if (match.Success){
                         killLuminance += double.Parse(match.Value);
                     }
-                    killsTotal += 1;
                 }
                 if ((eatbank == true) && (checkstr.StartsWith("[bank]"))) {e.Eat = true;}
                 if (checkstr.StartsWith("[bank] weakly enlightened coins:"))
