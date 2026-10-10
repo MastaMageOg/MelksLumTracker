@@ -75,6 +75,7 @@ namespace MelksLuminanceTracker
 		private double initialLuminance = -1;
 		private double currentCoins;
         private double curWEnlCoin = 0;
+        private double curPrestigeCoins = 0;
         private double curLegKey = 0;
         private double curMythKey = 0;
 		private double currentLuminance = 0;
@@ -143,6 +144,7 @@ namespace MelksLuminanceTracker
         private bool progenable = true;
         private bool buffenable = false;
         private bool eatbank = false;
+        private bool eatbankTail = false;
         private bool eatxp = false;
         private bool bankdata = false;
         private bool isinitialized = false;
@@ -183,7 +185,7 @@ namespace MelksLuminanceTracker
 		[MVControlReference("coinRateLabel")] private IStaticText coinRateLabel = null;
         [MVControlReference("lumRateCoinLabel")] private IStaticText lumRateCoinLabel = null;
 		[MVControlReference("effectiveCRateLabel")] private IStaticText effectiveCRateLabel = null;
-        [MVControlReference("effectiveLRateLabel")] private IStaticText effectiveLRateLabel = null;
+        [MVControlReference("prestigeCoinLabel")] private IStaticText prestigeCoinLabel = null;
 		[MVControlReference("timeLabel")] private IStaticText timeLabel = null;
 		[MVControlReference("ctimeLabel")] private IStaticText ctimeLabel = null;
 		[MVControlReference("convRateInput")] private ITextBox convRateInput = null;
@@ -638,6 +640,7 @@ namespace MelksLuminanceTracker
                 //Main Tab
                 luminCurrentLabel.Text = $"[Bank] Luminance: {tmplumcurstr}";
                 coinCurrentLabel.Text = $"[Bank] Coins: {currentCoins}";
+                prestigeCoinLabel.Text = $"[Bank] Prestige Coins: {curPrestigeCoins}";
                 int thours = (int)(Math.Floor(elapsed.TotalHours));
                 timeLabel.Text = $"Run Time: {thours}:{elapsed.Minutes:D2}";
                 string ctime = DateTime.Now.ToString("HH:mm");
@@ -647,7 +650,6 @@ namespace MelksLuminanceTracker
                 coinRateLumLabel.Text = $"Lum-Coins/hr: {coinRateLum}";
                 lumRateCoinLabel.Text = $"Coins-Lum/hr: {tmplumRateCoin}";
 				effectiveCRateLabel.Text = $"Effective C/hr: {effectiveCRate}";
-				effectiveLRateLabel.Text = $"Effective L/hr: {tmpeffectiveLRate}";
                 if (CoinMode == 0) {atcCurLbl.Text = $"A: {curAetheria} T: {curTrinket} C: {currentcoincount} CAvail: {coinclapavail}";} //0=red, 1=egg, 2=shells, 3=coins, 4=snowmen, 5=Jam
                 else if (CoinMode == 1) {atcCurLbl.Text = $"Eggs: {curPengEgg} C: {currentcoincount} MMD: {curMMD:n0}";} 
                 else if (CoinMode == 2) {atcCurLbl.Text = $"Shells: {curSlimyShells}  MMD: {curMMD:n0} MK: {curMythKey}";}
@@ -822,7 +824,6 @@ namespace MelksLuminanceTracker
                 coinRateLumLabel.Text = "Lum-Coins/hr: 0";
                 lumRateCoinLabel.Text = "Coins-Lum/hr: 0";
 				effectiveCRateLabel.Text = "Effective C/hr: 0";
-				effectiveLRateLabel.Text = "Effective L/hr: 0";
 				timeLabel.Text = "Run Time: 00:00";          
                 //Spec Tab
                 KillLabel.Text = "Kills: 0";
@@ -917,7 +918,6 @@ namespace MelksLuminanceTracker
                 coinRateLumLabel.Text = "Lum-Coins/hr: 0";
                 lumRateCoinLabel.Text = "Coins-Lum/hr: 0";
 				effectiveCRateLabel.Text = "Effective C/hr: 0";
-				effectiveLRateLabel.Text = "Effective L/hr: 0";
 				timeLabel.Text = "Run Time: 00:00";          
                 //Spec Tab
                 KillLabel.Text = "Kills: 0";
@@ -1606,7 +1606,7 @@ namespace MelksLuminanceTracker
                     string tmplk = checkstr.Substring(23).Replace(",","");
                     curLegKey = double.Parse(tmplk);
                 }
-                if (checkstr.StartsWith("[bank] Mythical Keys: "))
+                if (checkstr.StartsWith("[bank] mythical keys: "))
                 {
                     string tmpmk = checkstr.Substring(22).Replace(",","");
                     curMythKey = double.Parse(tmpmk);
@@ -1628,11 +1628,21 @@ namespace MelksLuminanceTracker
                         killLuminance += double.Parse(match.Value);
                     }
                 }
-                if ((eatbank == true) && (checkstr.StartsWith("[bank]"))) {e.Eat = true;}
+                // Prestige Coins can arrive after the weakly enlightened line that ends the poll, so keep eating
+                // [bank] lines until the first non-bank line.
+                if (eatbankTail && !checkstr.StartsWith("[bank]")) {eatbankTail = false;}
+                if ((eatbank || eatbankTail) && (checkstr.StartsWith("[bank]"))) {e.Eat = true;}
+                if (checkstr.StartsWith("[bank] prestige coins:")) //[BANK] Prestige Coins: 38 (bound to you - deposit / withdraw only)
+                {
+                    var pmatch = Regex.Match(checkstr.Replace(",", ""), @"prestige coins:\s*(\d+)");
+                    if (pmatch.Success) {curPrestigeCoins = double.Parse(pmatch.Groups[1].Value);}
+                    eatbankTail = false;
+                }
                 if (checkstr.StartsWith("[bank] weakly enlightened coins:"))
                 {
                     string tmpwec = checkstr.Substring(33).Replace(",","");
                     curWEnlCoin = double.Parse(tmpwec);
+                    if (eatbank) {eatbankTail = true;}
                     eatbank = false; 
                     bankdata = false;
                     if (clrTimer != null) clrTimer.Stop();
